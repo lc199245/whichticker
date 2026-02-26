@@ -179,10 +179,48 @@ async def get_ai_recommendation(
             "parse_error": True,
         }
     except Exception as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+
+        # Provide actionable diagnostics for common failure modes
+        if "connect" in error_msg.lower() or "connection" in error_type.lower():
+            diagnosis = (
+                f"AI recommendation failed: Connection error ({error_type}).\n\n"
+                "Possible causes:\n"
+                "• Corporate firewall/proxy blocking api.anthropic.com\n"
+                "• No internet access on this machine\n"
+                "• SSL interception by corporate proxy (try setting SSL_CERT_FILE or REQUESTS_CA_BUNDLE)\n\n"
+                "To test, run: curl -s https://api.anthropic.com/v1/messages -I\n\n"
+                f"Raw error: {error_msg}"
+            )
+        elif "auth" in error_msg.lower() or "api key" in error_msg.lower() or "401" in error_msg:
+            diagnosis = (
+                f"AI recommendation failed: Authentication error ({error_type}).\n\n"
+                "Your ANTHROPIC_API_KEY appears to be invalid or expired.\n"
+                "Check it at: https://console.anthropic.com/settings/keys\n\n"
+                f"Raw error: {error_msg}"
+            )
+        elif "rate" in error_msg.lower() or "429" in error_msg:
+            diagnosis = (
+                f"AI recommendation failed: Rate limited ({error_type}).\n\n"
+                "Too many requests — wait a moment and try again.\n\n"
+                f"Raw error: {error_msg}"
+            )
+        elif "timeout" in error_msg.lower():
+            diagnosis = (
+                f"AI recommendation failed: Request timed out ({error_type}).\n\n"
+                "The Anthropic API took too long to respond. This may be a temporary issue.\n\n"
+                f"Raw error: {error_msg}"
+            )
+        else:
+            diagnosis = f"AI recommendation failed: {error_type} — {error_msg}"
+
+        print(f"  [AI ERROR] {error_type}: {error_msg}")
+
         return {
             "signal": "N/A",
             "conviction": 0,
-            "recommendation": f"AI recommendation failed: {str(e)}",
+            "recommendation": diagnosis,
             "risk_factors": [],
             "available": False,
         }
