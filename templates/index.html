@@ -172,19 +172,34 @@
 
             <!-- ─── Price Ratio + Moving Averages Chart ────────────────── -->
             <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
-                <h3 class="text-sm font-semibold text-gray-300 mb-2">Price Ratio (A/B) with Moving Averages</h3>
+                <h3 class="text-sm font-semibold text-gray-300 mb-1">Price Ratio (A/B) with Moving Averages</h3>
+                <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+                    Price of A divided by price of B. A rising ratio means A is outperforming B.
+                    The 50-day and 200-day moving averages smooth out noise — ratio above both MAs suggests a sustained trend favoring A.
+                    Bollinger Bands (20-period, ±2 std dev) show the typical range of the ratio; touching the bands may signal overextension.
+                </p>
                 <div class="chart-wrapper-lg"><canvas id="chart-ratio"></canvas></div>
             </div>
 
             <!-- ─── Cumulative Returns Comparison ──────────────────────── -->
             <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
-                <h3 class="text-sm font-semibold text-gray-300 mb-2">Cumulative Return Comparison (%)</h3>
+                <h3 class="text-sm font-semibold text-gray-300 mb-1">Cumulative Return Comparison (%)</h3>
+                <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+                    Shows the total percentage return of each ticker from the start of the lookback period.
+                    Calculated as (current price / starting price − 1) × 100.
+                    The ticker with the higher line has delivered better returns over this window. Diverging lines indicate widening outperformance.
+                </p>
                 <div class="chart-wrapper-lg"><canvas id="chart-returns"></canvas></div>
             </div>
 
             <!-- ─── Ratio Z-Score Chart ────────────────────────────────── -->
             <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
-                <h3 class="text-sm font-semibold text-gray-300 mb-2">Ratio Z-Score</h3>
+                <h3 class="text-sm font-semibold text-gray-300 mb-1">Ratio Z-Score</h3>
+                <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+                    Z-Score = (current ratio − 20-day mean) / 20-day standard deviation.
+                    Measures how far the ratio has deviated from its recent average in standard deviations.
+                    Above +2σ = ratio is unusually high (A may be overextended). Below −2σ = ratio is unusually low (B may be overextended).
+                </p>
                 <div class="chart-wrapper-lg"><canvas id="chart-zscore"></canvas></div>
             </div>
 
@@ -200,12 +215,26 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <!-- RSI -->
                 <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-2">RSI (Ratio A/B)</h3>
+                    <h3 class="text-sm font-semibold text-gray-300 mb-1">RSI (Ratio A/B)</h3>
+                    <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+                        Relative Strength Index (14-period) applied to the price ratio A/B.
+                        Measures the speed and magnitude of recent ratio changes on a 0–100 scale.
+                        RSI = 100 − 100 / (1 + avg gain / avg loss) over the last 14 periods.
+                        Above 70 = ratio is overbought (A may be overextended vs B).
+                        Below 30 = ratio is oversold (A may be undervalued vs B).
+                    </p>
                     <div class="chart-wrapper"><canvas id="chart-rsi"></canvas></div>
                 </div>
                 <!-- MACD -->
                 <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
-                    <h3 class="text-sm font-semibold text-gray-300 mb-2">MACD (Ratio A/B)</h3>
+                    <h3 class="text-sm font-semibold text-gray-300 mb-1">MACD (Ratio A/B)</h3>
+                    <p class="text-[11px] text-gray-500 leading-relaxed mb-2">
+                        Moving Average Convergence Divergence applied to the price ratio A/B.
+                        MACD Line = 12-period EMA − 26-period EMA of the ratio.
+                        Signal Line = 9-period EMA of the MACD Line.
+                        Histogram = MACD Line − Signal Line (green = positive momentum for A, red = negative).
+                        When MACD crosses above the Signal line, the ratio's momentum is shifting in favor of A.
+                    </p>
                     <div class="chart-wrapper"><canvas id="chart-macd"></canvas></div>
                 </div>
             </div>
