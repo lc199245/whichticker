@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhichTicker — Relative Performance Analyzer</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        surface: { 1: '#0f1117', 2: '#161922', 3: '#1c1f2e', 4: '#252836' },
+                        gain: '#22c55e',
+                        loss: '#ef4444',
+                        accent: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body class="bg-surface-1 text-gray-200 min-h-screen">
+
+    <!-- ─── Header ──────────────────────────────────────────────────────── -->
+    <header class="bg-surface-2 border-b border-gray-800 sticky top-0 z-50">
+        <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
+                    <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+                </div>
+                <h1 class="text-lg font-bold text-white">WhichTicker</h1>
+            </div>
+            <span class="text-xs text-gray-500">Which ticker will outperform? Statistical + Technical + AI</span>
+        </div>
+    </header>
+
+    <!-- ─── Main Content ────────────────────────────────────────────────── -->
+    <main class="max-w-[1400px] mx-auto px-4 py-6">
+
+        <!-- ─── Input Section ───────────────────────────────────────────── -->
+        <div class="bg-surface-2 rounded-xl border border-gray-800 p-5 mb-6">
+            <div class="flex flex-col sm:flex-row items-end gap-4">
+                <!-- Ticker A -->
+                <div class="flex-1 w-full relative">
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1.5">Ticker A</label>
+                    <input type="text" id="input-ticker-a" placeholder="e.g. GLD"
+                           class="w-full bg-surface-3 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white
+                                  placeholder-gray-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
+                                  uppercase mono" autocomplete="off">
+                    <div id="dropdown-a" class="autocomplete-dropdown hidden"></div>
+                </div>
+
+                <!-- Ticker B -->
+                <div class="flex-1 w-full relative">
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1.5">Ticker B</label>
+                    <input type="text" id="input-ticker-b" placeholder="e.g. SLV"
+                           class="w-full bg-surface-3 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white
+                                  placeholder-gray-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent
+                                  uppercase mono" autocomplete="off">
+                    <div id="dropdown-b" class="autocomplete-dropdown hidden"></div>
+                </div>
+
+                <!-- Period -->
+                <div class="w-full sm:w-40">
+                    <label class="block text-xs text-gray-400 uppercase tracking-wider mb-1.5">Lookback</label>
+                    <select id="input-period"
+                            class="w-full bg-surface-3 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white
+                                   focus:outline-none focus:border-accent">
+                        {% for key, label in lookback_options.items() %}
+                        <option value="{{ key }}" {{ 'selected' if key == '1y' else '' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Analyze Button -->
+                <div class="w-full sm:w-auto">
+                    <button onclick="analyzePair()" id="analyze-btn"
+                            class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-accent hover:bg-blue-600
+                                   rounded-lg text-sm font-semibold text-white transition whitespace-nowrap">
+                        <i data-lucide="activity" class="w-4 h-4"></i>
+                        Compare
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error message -->
+            <div id="error-msg" class="hidden mt-3 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400"></div>
+        </div>
+
+        <!-- ─── History Panel ──────────────────────────────────────────── -->
+        <div id="history-panel" class="mb-6">
+            <div class="bg-surface-2 rounded-xl border border-gray-800">
+                <button onclick="toggleHistoryPanel()" id="history-toggle"
+                        class="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-surface-3 rounded-xl transition">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="history" class="w-4 h-4 text-gray-400"></i>
+                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent Analyses</span>
+                        <span id="history-count" class="text-[10px] text-gray-600 mono"></span>
+                    </div>
+                    <i data-lucide="chevron-down" id="history-chevron" class="w-4 h-4 text-gray-500 transition-transform expanded"></i>
+                </button>
+                <div id="history-list" class="border-t border-gray-800">
+                    <div class="px-5 py-4 text-center text-xs text-gray-600">No analyses yet — enter a pair above to get started.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Loading Spinner ─────────────────────────────────────────── -->
+        <div id="loading" class="hidden text-center py-16">
+            <div class="spinner mx-auto mb-4"></div>
+            <p class="text-gray-400 text-sm">Analyzing relative performance... fetching data, computing metrics, consulting AI...</p>
+        </div>
+
+        <!-- ─── Results (hidden until analysis completes) ───────────────── -->
+        <div id="results" class="hidden space-y-6">
+
+            <!-- ─── Signal Banner ───────────────────────────────────────── -->
+            <div id="signal-banner" class="bg-surface-2 rounded-xl border border-gray-800 p-5">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    <!-- Signal direction -->
+                    <div class="flex items-center gap-4">
+                        <div id="signal-icon" class="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-bold">
+                            --
+                        </div>
+                        <div>
+                            <div id="signal-direction" class="text-2xl font-bold">--</div>
+                            <div id="signal-detail" class="text-sm text-gray-400 mt-0.5">--</div>
+                        </div>
+                    </div>
+                    <!-- Conviction meter (0-100%) -->
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-500 uppercase tracking-wider">Conviction</span>
+                        <div class="conviction-meter" id="conviction-meter">
+                            <div class="conviction-meter-fill" id="conviction-fill" style="width: 0%"></div>
+                            <div class="conviction-meter-ticks">
+                                <span class="tick" style="left:20%"></span>
+                                <span class="tick" style="left:40%"></span>
+                                <span class="tick" style="left:60%"></span>
+                                <span class="tick" style="left:80%"></span>
+                            </div>
+                        </div>
+                        <span id="conviction-label" class="text-sm font-semibold mono">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Price Charts (side by side) ─────────────────────────── -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2" id="chart-a-title">Ticker A</h3>
+                    <div class="chart-wrapper"><canvas id="chart-price-a"></canvas></div>
+                </div>
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2" id="chart-b-title">Ticker B</h3>
+                    <div class="chart-wrapper"><canvas id="chart-price-b"></canvas></div>
+                </div>
+            </div>
+
+            <!-- ─── Price Ratio + Moving Averages Chart ────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                <h3 class="text-sm font-semibold text-gray-300 mb-2">Price Ratio (A/B) with Moving Averages</h3>
+                <div class="chart-wrapper-lg"><canvas id="chart-ratio"></canvas></div>
+            </div>
+
+            <!-- ─── Cumulative Returns Comparison ──────────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                <h3 class="text-sm font-semibold text-gray-300 mb-2">Cumulative Return Comparison (%)</h3>
+                <div class="chart-wrapper-lg"><canvas id="chart-returns"></canvas></div>
+            </div>
+
+            <!-- ─── Ratio Z-Score Chart ────────────────────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                <h3 class="text-sm font-semibold text-gray-300 mb-2">Ratio Z-Score</h3>
+                <div class="chart-wrapper-lg"><canvas id="chart-zscore"></canvas></div>
+            </div>
+
+            <!-- ─── Statistics Grid ─────────────────────────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-5">
+                <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Performance Metrics</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="stats-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- ─── Technical Indicators ────────────────────────────────── -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- RSI -->
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2">RSI (Ratio A/B)</h3>
+                    <div class="chart-wrapper"><canvas id="chart-rsi"></canvas></div>
+                </div>
+                <!-- MACD -->
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-2">MACD (Ratio A/B)</h3>
+                    <div class="chart-wrapper"><canvas id="chart-macd"></canvas></div>
+                </div>
+            </div>
+
+            <!-- ─── Technical Confirmation ──────────────────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-5">
+                <h3 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">Technical Confirmation</h3>
+                <div id="tech-signals" class="flex flex-wrap gap-2">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- ─── AI Recommendation ───────────────────────────────────── -->
+            <div class="bg-surface-2 rounded-xl border border-gray-800 p-5 ai-card">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="brain" class="w-5 h-5 text-accent"></i>
+                    <h3 class="text-sm font-semibold text-gray-300 uppercase tracking-wider">AI Recommendation</h3>
+                    <span class="text-[10px] text-gray-600 ml-auto">Powered by Claude</span>
+                </div>
+                <div id="ai-recommendation" class="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                    --
+                </div>
+                <div id="ai-risks" class="mt-4 hidden">
+                    <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-2">Risk Factors</h4>
+                    <ul id="ai-risk-list" class="space-y-1 text-sm text-gray-400">
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ─── Disclaimer ──────────────────────────────────────────── -->
+            <div class="text-center text-[10px] text-gray-600 py-4">
+                This tool is for educational and research purposes only. Not financial advice. Past performance does not guarantee future results.
+            </div>
+        </div>
+    </main>
+
+    <!-- ─── JavaScript ──────────────────────────────────────────────────── -->
+    <script src="/static/js/app.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
