@@ -7,8 +7,14 @@ from datetime import datetime, timedelta
 
 def _min_days_for_period(period: str) -> int:
     """Return minimum required trading days based on the lookback period."""
-    short_periods = {"1mo", "3mo"}
-    return 15 if period in short_periods else 30
+    return {"30d": 10, "60d": 20, "1mo": 15, "3mo": 15}.get(period, 30)
+
+
+def _yf_period(period: str) -> str:
+    """Map our period keys to yfinance period strings."""
+    # yfinance supports: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
+    # For 30d/60d we use the day-count format directly
+    return {"30d": "1mo", "60d": "3mo"}.get(period, period)
 
 
 def fetch_pair_data(
@@ -20,8 +26,9 @@ def fetch_pair_data(
     Returns (df_a, df_b) on success, or (None, error_message) on failure.
     """
     try:
-        hist_a = yf.Ticker(ticker_a).history(period=period)
-        hist_b = yf.Ticker(ticker_b).history(period=period)
+        yf_period = _yf_period(period)
+        hist_a = yf.Ticker(ticker_a).history(period=yf_period)
+        hist_b = yf.Ticker(ticker_b).history(period=yf_period)
 
         failed = []
         if hist_a.empty:
@@ -40,6 +47,13 @@ def fetch_pair_data(
         mask = close_a["close"].notna() & close_b["close"].notna()
         close_a = close_a[mask]
         close_b = close_b[mask]
+
+        # For 30d/60d, trim to exact calendar day window from today
+        day_trim = {"30d": 30, "60d": 60}.get(period)
+        if day_trim:
+            cutoff = datetime.now() - timedelta(days=day_trim)
+            close_a = close_a[close_a.index.tz_localize(None) >= cutoff]
+            close_b = close_b[close_b.index.tz_localize(None) >= cutoff]
 
         min_days = _min_days_for_period(period)
         if len(close_a) < min_days:
@@ -82,9 +96,14 @@ def get_price_series(ticker: str, period: str = "1y") -> dict | None:
     Returns dict with 'dates' (ISO strings) and 'prices' (floats).
     """
     try:
-        hist = yf.Ticker(ticker).history(period=period)
+        hist = yf.Ticker(ticker).history(period=_yf_period(period))
         if hist.empty:
             return None
+        # Trim to exact window for 30d/60d
+        day_trim = {"30d": 30, "60d": 60}.get(period)
+        if day_trim:
+            cutoff = datetime.now() - timedelta(days=day_trim)
+            hist = hist[hist.index.tz_localize(None) >= cutoff]
 
         dates = [d.strftime("%Y-%m-%d") for d in hist.index]
         prices = [round(float(p), 2) for p in hist["Close"]]

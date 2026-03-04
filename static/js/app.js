@@ -88,6 +88,12 @@ function renderResults(data) {
     document.getElementById('chart-a-title').textContent = `${data.ticker_a.symbol} — ${data.ticker_a.name}`;
     document.getElementById('chart-b-title').textContent = `${data.ticker_b.symbol} — ${data.ticker_b.name}`;
 
+    // Individual return charts
+    renderIndividualReturnChart('chart-return-a', data, 'a');
+    renderIndividualReturnChart('chart-return-b', data, 'b');
+    document.getElementById('chart-return-a-title').textContent = `${data.ticker_a.symbol} — Cumulative Return (%)`;
+    document.getElementById('chart-return-b-title').textContent = `${data.ticker_b.symbol} — Cumulative Return (%)`;
+
     // Price Ratio + MAs
     renderRatioChart('chart-ratio', data);
 
@@ -161,6 +167,71 @@ function renderPriceChart(canvasId, tickerData, color) {
             scales: {
                 x: { ...baseXScale(labels) },
                 y: { ...baseYScale() },
+            },
+        },
+    });
+}
+
+// ── Individual Cumulative Return Chart ───────────────────────────────────────
+
+function renderIndividualReturnChart(canvasId, data, which) {
+    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    if (!ctx) return;
+
+    const dates    = data.returns.dates || [];
+    const retVals  = which === 'a' ? data.returns.returns_a : data.returns.returns_b;
+    const symbol   = which === 'a' ? data.ticker_a.symbol : data.ticker_b.symbol;
+    const color    = which === 'a' ? COLORS.accent : COLORS.purple;
+    const labels   = thinLabels(dates, 8);
+
+    // Determine if overall return is positive or negative for fill colour
+    const lastVal  = retVals ? retVals.filter(v => v !== null).at(-1) : 0;
+    const fillColor = lastVal >= 0 ? hexToRgba(color, 0.12) : hexToRgba('#ef4444', 0.10);
+
+    charts[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: `${symbol} Return (%)`,
+                data: retVals,
+                borderColor: color,
+                backgroundColor: fillColor,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                fill: true,
+                tension: 0.3,
+            }],
+        },
+        options: {
+            ...baseChartOptions(),
+            scales: {
+                x: { ...baseXScale(labels) },
+                y: {
+                    ...baseYScale(),
+                    ticks: {
+                        ...baseYScale().ticks,
+                        callback: v => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`,
+                    },
+                },
+            },
+            plugins: {
+                ...baseChartOptions().plugins,
+                tooltip: {
+                    ...baseChartOptions().plugins.tooltip,
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.parsed.y;
+                            return ` ${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+                        },
+                    },
+                },
+                // Zero-line annotation
+                annotation: {
+                    annotations: {
+                        zero: { type: 'line', yMin: 0, yMax: 0, borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1 },
+                    },
+                },
             },
         },
     });
@@ -514,22 +585,22 @@ function renderStatistics(stats, symbolA, symbolB) {
             tip: `Price of ${symbolA} divided by ${symbolB}. A rising ratio means ${symbolA} is outperforming. A falling ratio means ${symbolB} is outperforming.`,
         },
         {
-            label: `Ratio vs 50d MA`,
+            label: `Ratio vs ${stats.ma_short_window || 50}d MA`,
             value: stats.ratio_above_ma_50 === true ? 'Above ↑' : stats.ratio_above_ma_50 === false ? 'Below ↓' : 'N/A',
             cls: stats.ratio_above_ma_50 === true ? 'stat-good' : stats.ratio_above_ma_50 === false ? 'stat-bad' : 'stat-neutral',
-            tip: `50-day moving average of the price ratio. Above (green) = favors ${symbolA}. Below (red) = favors ${symbolB}.`,
+            tip: `${stats.ma_short_window || 50}-day moving average of the price ratio. Above (green) = favors ${symbolA}. Below (red) = favors ${symbolB}.`,
         },
         {
-            label: `Ratio vs 200d MA`,
+            label: `Ratio vs ${stats.ma_long_window || 200}d MA`,
             value: stats.ratio_above_ma_200 === true ? 'Above ↑' : stats.ratio_above_ma_200 === false ? 'Below ↓' : 'N/A',
             cls: stats.ratio_above_ma_200 === true ? 'stat-good' : stats.ratio_above_ma_200 === false ? 'stat-bad' : 'stat-neutral',
-            tip: `200-day moving average of the price ratio. Above (green) = favors ${symbolA}. Below (red) = favors ${symbolB}.`,
+            tip: `${stats.ma_long_window || 200}-day moving average of the price ratio. Above (green) = favors ${symbolA}. Below (red) = favors ${symbolB}.`,
         },
         {
             label: 'Momentum (ROC)',
             value: stats.momentum_roc !== null ? `${stats.momentum_roc > 0 ? '+' : ''}${fmt(stats.momentum_roc, 2)}%` : 'N/A',
             cls: stats.momentum_roc > 0 ? 'stat-good' : stats.momentum_roc < 0 ? 'stat-bad' : 'stat-neutral',
-            tip: `Rate of Change over 20 days on the price ratio. Positive (green) = favors ${symbolA}. Negative (red) = favors ${symbolB}.`,
+            tip: `Rate of Change on the price ratio. Positive (green) = favors ${symbolA}. Negative (red) = favors ${symbolB}.`,
         },
         {
             label: 'Momentum Direction',

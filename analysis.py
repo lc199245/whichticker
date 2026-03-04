@@ -7,6 +7,7 @@ from statsmodels.tsa.stattools import coint, adfuller
 from config import (
     RATIO_MA_SHORT, RATIO_MA_LONG, RATIO_ZSCORE_WINDOW,
     MOMENTUM_WINDOW, RELATIVE_RETURN_PERIODS,
+    PERIOD_MA_WINDOWS, PERIOD_MOMENTUM_WINDOWS,
 )
 
 
@@ -88,13 +89,14 @@ def compute_ratio_momentum(ratio: pd.Series, window: int = MOMENTUM_WINDOW) -> d
 
 # ── Ratio Moving Averages ────────────────────────────────────────────────────
 
-def compute_ratio_ma(ratio: pd.Series) -> dict:
+def compute_ratio_ma(ratio: pd.Series, short: int = RATIO_MA_SHORT, long: int = RATIO_MA_LONG) -> dict:
     """
-    50-day and 200-day simple moving averages on the price ratio.
+    Short and long simple moving averages on the price ratio.
+    Windows are adaptive based on period (default: 50/200d for 1y+).
     Returns series + current values + above/below flags.
     """
-    ma_short = ratio.rolling(window=RATIO_MA_SHORT).mean()
-    ma_long  = ratio.rolling(window=RATIO_MA_LONG).mean()
+    ma_short = ratio.rolling(window=short).mean()
+    ma_long  = ratio.rolling(window=long).mean()
 
     current_ratio = float(ratio.dropna().iloc[-1]) if len(ratio.dropna()) > 0 else None
 
@@ -347,6 +349,7 @@ def run_full_analysis(
     prices_a: pd.Series,
     prices_b: pd.Series,
     tech_confirmation: dict | None = None,
+    period: str = "1y",
 ) -> dict:
     """
     Run the complete relative performance analysis pipeline.
@@ -356,19 +359,25 @@ def run_full_analysis(
     prices_a, prices_b : aligned price series
     tech_confirmation  : optional dict from technical_confirmation()
                          (RSI, MACD, BB on the ratio) — fed into signal generation
+    period             : lookback period key — used to select adaptive MA/momentum windows
     """
+
+    # Adaptive windows based on period (short periods need shorter MAs)
+    ma_short_w, ma_long_w = PERIOD_MA_WINDOWS.get(period, (RATIO_MA_SHORT, RATIO_MA_LONG))
+    mom_w = PERIOD_MOMENTUM_WINDOWS.get(period, MOMENTUM_WINDOW)
+    zscore_w = min(RATIO_ZSCORE_WINDOW, max(5, len(prices_a) // 4))
 
     # 1. Price ratio
     ratio = compute_price_ratio(prices_a, prices_b)
 
-    # 2. Moving averages on ratio
-    ma_info = compute_ratio_ma(ratio)
+    # 2. Moving averages on ratio (adaptive windows)
+    ma_info = compute_ratio_ma(ratio, short=ma_short_w, long=ma_long_w)
 
-    # 3. Z-score on ratio
-    zscore = compute_zscore(ratio)
+    # 3. Z-score on ratio (adaptive window)
+    zscore = compute_zscore(ratio, window=zscore_w)
 
-    # 4. Momentum
-    momentum = compute_ratio_momentum(ratio)
+    # 4. Momentum (adaptive window)
+    momentum = compute_ratio_momentum(ratio, window=mom_w)
 
     # 5. Cumulative returns
     returns_a = compute_returns(prices_a)
@@ -409,10 +418,17 @@ def run_full_analysis(
     return {
         "statistics": {
             "current_ratio":      ma_info["current_ratio"],
+            "ratio_ma_short":     ma_info["ma_short"],
+            "ratio_ma_long":      ma_info["ma_long"],
+            "ratio_above_ma_short": ma_info["above_ma_short"],
+            "ratio_above_ma_long":  ma_info["above_ma_long"],
+            # Legacy aliases for backward compat with frontend
             "ratio_ma_50":        ma_info["ma_short"],
             "ratio_ma_200":       ma_info["ma_long"],
             "ratio_above_ma_50":  ma_info["above_ma_short"],
             "ratio_above_ma_200": ma_info["above_ma_long"],
+            "ma_short_window":    ma_short_w,
+            "ma_long_window":     ma_long_w,
             "momentum_roc":       momentum["current_roc"],
             "momentum_direction": momentum["direction"],
             "relative_returns":   rel_returns,

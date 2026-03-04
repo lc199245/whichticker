@@ -28,6 +28,8 @@ ANTHROPIC_MODEL = "claude-haiku-4-5"
 # ── Lookback Options ─────────────────────────────────────────────────────────
 DEFAULT_LOOKBACK = "1y"
 LOOKBACK_OPTIONS = {
+    "30d": "30 Days",
+    "60d": "60 Days",
     "1mo": "1 Month",
     "3mo": "3 Months",
     "6mo": "6 Months",
@@ -36,11 +38,36 @@ LOOKBACK_OPTIONS = {
     "5y":  "5 Years",
 }
 
+# ── Adaptive MA windows by period ─────────────────────────────────────────────
+# Short periods don't have enough data for 50/200d MAs — use shorter windows.
+PERIOD_MA_WINDOWS = {
+    "30d": (5,  15),    # ~1 week / ~3 weeks
+    "60d": (10, 30),    # ~2 weeks / ~6 weeks
+    "1mo": (5,  15),    # ~1 week / ~3 weeks
+    "3mo": (10, 50),    # ~2 weeks / 50d
+    "6mo": (20, 100),   # 20d / 100d
+    "1y":  (50, 200),   # standard
+    "2y":  (50, 200),
+    "5y":  (50, 200),
+}
+
+# ── Adaptive momentum/zscore windows by period ────────────────────────────────
+PERIOD_MOMENTUM_WINDOWS = {
+    "30d": 5,
+    "60d": 10,
+    "1mo": 5,
+    "3mo": 10,
+    "6mo": 15,
+    "1y":  20,
+    "2y":  20,
+    "5y":  20,
+}
+
 # ── Ratio / Relative Performance Parameters ──────────────────────────────────
-RATIO_MA_SHORT = 50       # short moving average on price ratio
-RATIO_MA_LONG  = 200      # long moving average on price ratio
-RATIO_ZSCORE_WINDOW = 20  # rolling window for z-score of ratio
-MOMENTUM_WINDOW = 20      # lookback for momentum (rate of change)
+RATIO_MA_SHORT = 50       # default short MA (overridden per-period by PERIOD_MA_WINDOWS)
+RATIO_MA_LONG  = 200      # default long MA  (overridden per-period by PERIOD_MA_WINDOWS)
+RATIO_ZSCORE_WINDOW = 20  # rolling window for z-score of ratio (overridden per-period)
+MOMENTUM_WINDOW = 20      # lookback for momentum (overridden per-period)
 RELATIVE_RETURN_PERIODS = {   # periods for return differential comparison
     "1mo": 21,
     "3mo": 63,

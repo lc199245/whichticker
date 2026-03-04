@@ -89,7 +89,7 @@ async def api_analyze(body: AnalyzeRequest):
 
         # 3. Statistical analysis (ratio-based) — now includes tech confirmation in signal
         analysis = await asyncio.to_thread(
-            run_full_analysis, prices_a, prices_b, technicals.get("confirmation")
+            run_full_analysis, prices_a, prices_b, technicals.get("confirmation"), period
         )
 
         # 3b. Individual RSI for comparison
