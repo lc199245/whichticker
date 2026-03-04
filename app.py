@@ -109,7 +109,7 @@ async def api_analyze(body: AnalyzeRequest):
         )
 
         # 5. Combine signal: stat + technical + AI
-        combined_conviction = _compute_conviction(analysis, technicals, ai_rec)
+        combined_conviction = _compute_conviction(analysis, technicals, ai_rec, period)
 
         # If user's input order was swapped, flip direction labels and reorder data
         if swapped:
@@ -259,7 +259,7 @@ def _sanitize(obj):
     return obj
 
 
-def _compute_conviction(analysis: dict, technicals: dict, ai_rec: dict) -> dict:
+def _compute_conviction(analysis: dict, technicals: dict, ai_rec: dict, period: str = "1y") -> dict:
     """
     Combine statistical, technical, and AI signals into a 0-100 conviction score.
 
@@ -356,15 +356,17 @@ def _compute_conviction(analysis: dict, technicals: dict, ai_rec: dict) -> dict:
         # --- Technical (3 × 10 = 30 pts) ---
 
         # 5. RSI on ratio (0-10): distance from 50
+        #    Downweight for short periods (30d/60d) since RSI needs ~14 bars to stabilize
+        rsi_weight = 0.3 if period in ("30d", "60d") else 1.0
         rsi_val = tech_conf.get("rsi_value")
         if rsi_val is not None:
             rsi_dev = rsi_val - 50  # positive = favors A, negative = favors B
             if favor_a and rsi_dev > 0:
-                score += min(10, 3 + min(abs(rsi_dev) * 0.4, 7))
+                score += min(10, 3 + min(abs(rsi_dev) * 0.4, 7)) * rsi_weight
             elif not favor_a and rsi_dev < 0:
-                score += min(10, 3 + min(abs(rsi_dev) * 0.4, 7))
+                score += min(10, 3 + min(abs(rsi_dev) * 0.4, 7)) * rsi_weight
             elif abs(rsi_dev) < 5:
-                score += 2  # near neutral, slight credit
+                score += 2 * rsi_weight  # near neutral, slight credit
 
         # 6. MACD histogram (0-10): sign + magnitude
         macd_hist = tech_conf.get("macd_hist")

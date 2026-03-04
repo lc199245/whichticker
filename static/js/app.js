@@ -324,6 +324,23 @@ function renderReturnsChart(canvasId, data) {
     const periodicA = data.returns.periodic_a || [];
     const periodicB = data.returns.periodic_b || [];
 
+    // Pre-compute aligned y-axis ranges so both axes share the same zero line
+    const allCum = [...data.returns.returns_a, ...data.returns.returns_b].filter(v => v != null);
+    const allPer = [...periodicA, ...periodicB].filter(v => v != null);
+    const cumMin = Math.min(...allCum, 0), cumMax = Math.max(...allCum, 0);
+    const perMin = Math.min(...allPer, 0), perMax = Math.max(...allPer, 0);
+    const cumRange = cumMax - cumMin || 1;
+    const zeroPos = -cumMin / cumRange;  // 0–1: where zero sits on the y axis
+
+    let y1Min = perMin, y1Max = perMax;
+    if (zeroPos > 0 && zeroPos < 1) {
+        // Expand y1 range so its zero sits at the same proportional position
+        const needMin = -(zeroPos / (1 - zeroPos)) * perMax;
+        const needMax = -((1 - zeroPos) / zeroPos) * perMin;
+        y1Min = Math.min(perMin, needMin);
+        y1Max = Math.max(perMax, needMax);
+    }
+
     // Build bar colors: green for positive, red for negative, with ticker tint
     function barColors(values, posColor, negColor) {
         return values.map(v => v != null && v >= 0 ? posColor : negColor);
@@ -402,6 +419,8 @@ function renderReturnsChart(canvasId, data) {
                 y1: {
                     ...baseYScale(),
                     position: 'right',
+                    min: y1Min,
+                    max: y1Max,
                     grid: { drawOnChartArea: false },
                     ticks: {
                         ...baseYScale().ticks,
@@ -412,12 +431,6 @@ function renderReturnsChart(canvasId, data) {
                         text: periodicLabel + ' Return %',
                         color: COLORS.text,
                         font: { size: 10, family: FONT.family },
-                    },
-                    // Keep zero aligned with primary axis
-                    afterDataLimits: function(axis) {
-                        const max = Math.max(Math.abs(axis.min), Math.abs(axis.max));
-                        axis.min = -max;
-                        axis.max = max;
                     },
                 },
             },
