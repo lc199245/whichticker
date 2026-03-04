@@ -42,9 +42,9 @@ def compute_periodic_returns(
     For all other periods: monthly returns (first→last price per calendar month),
     mapped to the last trading day of that month; other dates get None.
     """
-    short_periods = {"30d", "60d"}
+    daily_periods = {"30d", "60d", "3mo", "6mo", "9mo"}
 
-    if period in short_periods:
+    if period in daily_periods:
         # Daily pct change
         pct_a = prices_a.pct_change() * 100
         pct_b = prices_b.pct_change() * 100
