@@ -30,6 +30,66 @@ def compute_returns(prices: pd.Series) -> pd.Series:
     return ((prices / prices.iloc[0]) - 1) * 100
 
 
+# ── Periodic Returns (daily or monthly bars) ─────────────────────────────
+
+def compute_periodic_returns(
+    prices_a: pd.Series, prices_b: pd.Series, period: str
+) -> dict:
+    """
+    Compute periodic returns for bar-chart overlay on cumulative returns.
+
+    For 30d/60d lookback: daily percentage change.
+    For all other periods: monthly returns (first→last price per calendar month),
+    mapped to the last trading day of that month; other dates get None.
+    """
+    short_periods = {"30d", "60d"}
+
+    if period in short_periods:
+        # Daily pct change
+        pct_a = prices_a.pct_change() * 100
+        pct_b = prices_b.pct_change() * 100
+        periodic_a = [round(float(v), 4) if not np.isnan(v) else None for v in pct_a]
+        periodic_b = [round(float(v), 4) if not np.isnan(v) else None for v in pct_b]
+        return {
+            "periodic_a": periodic_a,
+            "periodic_b": periodic_b,
+            "periodic_label": "Daily",
+        }
+
+    # Monthly returns: % change from first to last price in each calendar month
+    monthly_a = prices_a.groupby(prices_a.index.to_period("M")).apply(
+        lambda g: float((g.iloc[-1] / g.iloc[0] - 1) * 100)
+    )
+    monthly_b = prices_b.groupby(prices_b.index.to_period("M")).apply(
+        lambda g: float((g.iloc[-1] / g.iloc[0] - 1) * 100)
+    )
+
+    # Map each monthly value to the last trading day of that month
+    last_days = prices_a.groupby(prices_a.index.to_period("M")).apply(
+        lambda g: g.index[-1]
+    )
+    last_day_set = {}
+    for per, dt in last_days.items():
+        last_day_set[dt] = per
+
+    periodic_a = []
+    periodic_b = []
+    for dt in prices_a.index:
+        if dt in last_day_set:
+            per = last_day_set[dt]
+            periodic_a.append(round(float(monthly_a[per]), 4) if per in monthly_a.index else None)
+            periodic_b.append(round(float(monthly_b[per]), 4) if per in monthly_b.index else None)
+        else:
+            periodic_a.append(None)
+            periodic_b.append(None)
+
+    return {
+        "periodic_a": periodic_a,
+        "periodic_b": periodic_b,
+        "periodic_label": "Monthly",
+    }
+
+
 # ── Relative Returns over Standard Periods ────────────────────────────────────
 
 def compute_relative_returns(prices_a: pd.Series, prices_b: pd.Series) -> dict:
@@ -383,6 +443,9 @@ def run_full_analysis(
     returns_a = compute_returns(prices_a)
     returns_b = compute_returns(prices_b)
 
+    # 5b. Periodic returns (daily or monthly bars)
+    periodic = compute_periodic_returns(prices_a, prices_b, period)
+
     # 6. Relative returns (1mo, 3mo, 6mo)
     rel_returns = compute_relative_returns(prices_a, prices_b)
 
@@ -453,6 +516,9 @@ def run_full_analysis(
             "dates":     dates,
             "returns_a": returns_a_vals,
             "returns_b": returns_b_vals,
+            "periodic_a": periodic["periodic_a"],
+            "periodic_b": periodic["periodic_b"],
+            "periodic_label": periodic["periodic_label"],
         },
         "correlation_rolling": {
             "dates":  dates,

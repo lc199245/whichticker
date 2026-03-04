@@ -88,12 +88,6 @@ function renderResults(data) {
     document.getElementById('chart-a-title').textContent = `${data.ticker_a.symbol} — ${data.ticker_a.name}`;
     document.getElementById('chart-b-title').textContent = `${data.ticker_b.symbol} — ${data.ticker_b.name}`;
 
-    // Individual return charts
-    renderIndividualReturnChart('chart-return-a', data, 'a');
-    renderIndividualReturnChart('chart-return-b', data, 'b');
-    document.getElementById('chart-return-a-title').textContent = `${data.ticker_a.symbol} — Cumulative Return (%)`;
-    document.getElementById('chart-return-b-title').textContent = `${data.ticker_b.symbol} — Cumulative Return (%)`;
-
     // Price Ratio + MAs
     renderRatioChart('chart-ratio', data);
 
@@ -326,33 +320,73 @@ function renderReturnsChart(canvasId, data) {
     const dates  = data.returns.dates;
     const labels = thinLabels(dates, 10);
 
+    const periodicLabel = data.returns.periodic_label || 'Daily';
+    const periodicA = data.returns.periodic_a || [];
+    const periodicB = data.returns.periodic_b || [];
+
+    // Build bar colors: green for positive, red for negative, with ticker tint
+    function barColors(values, posColor, negColor) {
+        return values.map(v => v != null && v >= 0 ? posColor : negColor);
+    }
+
+    const datasets = [
+        // Bars drawn first (behind lines)
+        {
+            type: 'bar',
+            label: `${data.ticker_a.symbol} ${periodicLabel} Return`,
+            data: periodicA,
+            backgroundColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.35), hexToRgba(COLORS.loss, 0.35)),
+            borderColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.6), hexToRgba(COLORS.loss, 0.6)),
+            borderWidth: 1,
+            yAxisID: 'y',
+            order: 2,
+            barPercentage: 0.9,
+            categoryPercentage: 0.8,
+        },
+        {
+            type: 'bar',
+            label: `${data.ticker_b.symbol} ${periodicLabel} Return`,
+            data: periodicB,
+            backgroundColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.35), hexToRgba(COLORS.orange, 0.35)),
+            borderColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.6), hexToRgba(COLORS.orange, 0.6)),
+            borderWidth: 1,
+            yAxisID: 'y',
+            order: 2,
+            barPercentage: 0.9,
+            categoryPercentage: 0.8,
+        },
+        // Lines drawn on top
+        {
+            type: 'line',
+            label: data.ticker_a.symbol,
+            data: data.returns.returns_a,
+            borderColor: COLORS.accent,
+            backgroundColor: hexToRgba(COLORS.accent, 0.05),
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+            yAxisID: 'y',
+            order: 1,
+        },
+        {
+            type: 'line',
+            label: data.ticker_b.symbol,
+            data: data.returns.returns_b,
+            borderColor: COLORS.purple,
+            backgroundColor: hexToRgba(COLORS.purple, 0.05),
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+            yAxisID: 'y',
+            order: 1,
+        },
+    ];
+
     charts[canvasId] = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: dates,
-            datasets: [
-                {
-                    label: data.ticker_a.symbol,
-                    data: data.returns.returns_a,
-                    borderColor: COLORS.accent,
-                    backgroundColor: hexToRgba(COLORS.accent, 0.05),
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    fill: true,
-                    tension: 0.2,
-                },
-                {
-                    label: data.ticker_b.symbol,
-                    data: data.returns.returns_b,
-                    borderColor: COLORS.purple,
-                    backgroundColor: hexToRgba(COLORS.purple, 0.05),
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    fill: true,
-                    tension: 0.2,
-                },
-            ],
-        },
+        data: { labels: dates, datasets },
         options: {
             ...baseChartOptions(),
             scales: {

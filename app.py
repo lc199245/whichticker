@@ -67,8 +67,13 @@ async def api_analyze(body: AnalyzeRequest):
         return JSONResponse({"error": "Tickers must be different."}, status_code=400)
 
     try:
+        # Canonical ordering: always compute ratio with alphabetically-first ticker
+        # as "A" so that swapping input order produces identical conviction scores.
+        swapped = ticker_a > ticker_b
+        canon_a, canon_b = (ticker_b, ticker_a) if swapped else (ticker_a, ticker_b)
+
         # 1. Fetch price data (run in thread to not block event loop)
-        result = await asyncio.to_thread(fetch_pair_data, ticker_a, ticker_b, period)
+        result = await asyncio.to_thread(fetch_pair_data, canon_a, canon_b, period)
 
         # fetch_pair_data returns (None, error_string) on failure
         if result[0] is None:
@@ -80,8 +85,8 @@ async def api_analyze(body: AnalyzeRequest):
         prices_b = df_b["close"]
 
         # Also fetch full chart data for individual price charts
-        chart_a = await asyncio.to_thread(get_price_series, ticker_a, period)
-        chart_b = await asyncio.to_thread(get_price_series, ticker_b, period)
+        chart_a = await asyncio.to_thread(get_price_series, canon_a, period)
+        chart_b = await asyncio.to_thread(get_price_series, canon_b, period)
 
         # 2. Technical indicators on the price ratio (computed first so we can feed into signals)
         ratio_series = compute_price_ratio(prices_a, prices_b)
@@ -95,9 +100,9 @@ async def api_analyze(body: AnalyzeRequest):
         # 3b. Individual RSI for comparison
         individual_rsi = await asyncio.to_thread(compute_individual_rsi, prices_a, prices_b)
 
-        # 4. AI recommendation
+        # 4. AI recommendation (pass canonical order)
         ai_rec = await get_ai_recommendation(
-            ticker_a, ticker_b,
+            canon_a, canon_b,
             analysis["statistics"],
             technicals,
             analysis["signal"],
@@ -105,6 +110,15 @@ async def api_analyze(body: AnalyzeRequest):
 
         # 5. Combine signal: stat + technical + AI
         combined_conviction = _compute_conviction(analysis, technicals, ai_rec)
+
+        # If user's input order was swapped, flip direction labels and reorder data
+        if swapped:
+            analysis = _flip_analysis(analysis)
+            technicals = _flip_technicals(technicals)
+            individual_rsi = _flip_individual_rsi(individual_rsi)
+            ai_rec = _flip_ai_rec(ai_rec)
+            combined_conviction = _flip_combined(combined_conviction)
+            chart_a, chart_b = chart_b, chart_a
 
         payload = _sanitize({
             "ticker_a": chart_a or {"symbol": ticker_a, "name": ticker_a, "dates": [], "prices": []},
@@ -147,6 +161,87 @@ async def api_search(q: str = ""):
         return JSONResponse({"results": []})
     results = await asyncio.to_thread(search_tickers, query)
     return JSONResponse({"results": results})
+
+
+# ── Canonical-order flip helpers ──────────────────────────────────────────────
+# When the user's input order (A, B) differs from canonical (alphabetical) order,
+# we flip all direction labels so the UI shows the correct ticker as favored.
+
+_DIR_FLIP = {
+    "FAVOR_A": "FAVOR_B", "FAVOR_B": "FAVOR_A",
+    "FAVORS_A": "FAVORS_B", "FAVORS_B": "FAVORS_A",
+    "NEUTRAL": "NEUTRAL", "FLAT": "FLAT", "N/A": "N/A",
+}
+
+
+def _flip_dir(d: str) -> str:
+    return _DIR_FLIP.get(d, d)
+
+
+def _flip_analysis(analysis: dict) -> dict:
+    """Swap A↔B in the analysis dict returned by run_full_analysis()."""
+    a = {**analysis}
+
+    # signal
+    sig = {**a["signal"]}
+    sig["direction"] = _flip_dir(sig["direction"])
+    sig["favor_a_count"], sig["favor_b_count"] = sig["favor_b_count"], sig["favor_a_count"]
+    if "A is outperforming" in sig.get("detail", ""):
+        sig["detail"] = sig["detail"].replace("A is outperforming B", "B is outperforming A").replace("A slightly outperforming B", "B slightly outperforming A")
+    elif "B is outperforming" in sig.get("detail", ""):
+        sig["detail"] = sig["detail"].replace("B is outperforming A", "A is outperforming B").replace("B slightly outperforming A", "A slightly outperforming B")
+    a["signal"] = sig
+
+    # statistics
+    st = {**a["statistics"]}
+    rr = st.get("relative_returns", {})
+    flipped_rr = {}
+    for period, vals in rr.items():
+        v = {**vals}
+        v["return_a"], v["return_b"] = v.get("return_b"), v.get("return_a")
+        if v.get("differential") is not None:
+            v["differential"] = -v["differential"]
+        flipped_rr[period] = v
+    st["relative_returns"] = flipped_rr
+    a["statistics"] = st
+
+    # returns chart data
+    ret = {**a["returns"]}
+    ret["returns_a"], ret["returns_b"] = ret["returns_b"], ret["returns_a"]
+    ret["periodic_a"], ret["periodic_b"] = ret["periodic_b"], ret["periodic_a"]
+    a["returns"] = ret
+
+    return a
+
+
+def _flip_technicals(technicals: dict) -> dict:
+    t = {**technicals}
+    if "confirmation" in t:
+        conf = {**t["confirmation"]}
+        conf["direction"] = _flip_dir(conf.get("direction", "NEUTRAL"))
+        conf["favors_a_count"], conf["favors_b_count"] = conf.get("favors_b_count", 0), conf.get("favors_a_count", 0)
+        t["confirmation"] = conf
+    return t
+
+
+def _flip_individual_rsi(rsi: dict) -> dict:
+    r = {**rsi}
+    r["rsi_a"], r["rsi_b"] = r.get("rsi_b"), r.get("rsi_a")
+    r["rsi_a_series"], r["rsi_b_series"] = r.get("rsi_b_series"), r.get("rsi_a_series")
+    return r
+
+
+def _flip_ai_rec(ai_rec: dict) -> dict:
+    r = {**ai_rec}
+    sig = r.get("signal", "N/A")
+    r["signal"] = _flip_dir(sig)
+    return r
+
+
+def _flip_combined(combined: dict) -> dict:
+    c = {**combined}
+    c["direction"] = _flip_dir(c.get("direction", "NEUTRAL"))
+    return c
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
