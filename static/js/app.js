@@ -92,7 +92,8 @@ function renderResults(data) {
     renderRatioChart('chart-ratio', data);
 
     // Cumulative Returns Comparison
-    renderReturnsChart('chart-returns', data);
+    const period = document.getElementById('input-period').value;
+    renderReturnsChart('chart-returns', data, period);
 
     // Z-Score
     renderZScoreChart('chart-zscore', data);
@@ -315,26 +316,54 @@ function renderRatioChart(canvasId, data) {
 
 // ── Cumulative Returns Comparison Chart ──────────────────────────────────────
 
-function renderReturnsChart(canvasId, data) {
+function renderReturnsChart(canvasId, data, period) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     const dates  = data.returns.dates;
-    const labels = thinLabels(dates, 10);
 
-    const periodicLabel = data.returns.periodic_label || 'Daily';
-    const periodicA = data.returns.periodic_a || [];
-    const periodicB = data.returns.periodic_b || [];
+    // For 1y+ periods, use monthly ticks (first trading day of each month);
+    // otherwise use evenly-spaced ticks (~10).
+    const longPeriods = new Set(['1y', '2y', '5y']);
+    let tickIndices = [];
+
+    if (longPeriods.has(period)) {
+        // Monthly: pick index where the month changes
+        tickIndices.push(0);
+        for (let i = 1; i < dates.length; i++) {
+            if (dates[i].slice(0, 7) !== dates[i - 1].slice(0, 7)) tickIndices.push(i);
+        }
+    } else {
+        const step = dates.length <= 10 ? 1 : Math.ceil(dates.length / 10);
+        for (let i = 0; i < dates.length; i += step) tickIndices.push(i);
+    }
+    if (tickIndices[tickIndices.length - 1] !== dates.length - 1)
+        tickIndices.push(dates.length - 1);
+
+    const labels = tickIndices.map(i => dates[i]);
+
+    function intervalBars(cumReturns) {
+        const bars = new Array(dates.length).fill(null);
+        for (let t = 1; t < tickIndices.length; t++) {
+            const s = tickIndices[t - 1], e = tickIndices[t];
+            const sf = (cumReturns[s] || 0) / 100 + 1;
+            const ef = (cumReturns[e] || 0) / 100 + 1;
+            bars[e] = Math.round((ef / sf - 1) * 100 * 10000) / 10000;
+        }
+        return bars;
+    }
+
+    const barsA = intervalBars(data.returns.returns_a);
+    const barsB = intervalBars(data.returns.returns_b);
 
     // Pre-compute aligned y-axis ranges so both axes share the same zero line
     const allCum = [...data.returns.returns_a, ...data.returns.returns_b].filter(v => v != null);
-    const allPer = [...periodicA, ...periodicB].filter(v => v != null);
+    const allPer = [...barsA, ...barsB].filter(v => v != null);
     const cumMin = Math.min(...allCum, 0), cumMax = Math.max(...allCum, 0);
     const perMin = Math.min(...allPer, 0), perMax = Math.max(...allPer, 0);
     const cumRange = cumMax - cumMin || 1;
-    const zeroPos = -cumMin / cumRange;  // 0–1: where zero sits on the y axis
+    const zeroPos = -cumMin / cumRange;
 
     let y1Min = perMin, y1Max = perMax;
     if (zeroPos > 0 && zeroPos < 1) {
-        // Expand y1 range so its zero sits at the same proportional position
         const needMin = -(zeroPos / (1 - zeroPos)) * perMax;
         const needMax = -((1 - zeroPos) / zeroPos) * perMin;
         y1Min = Math.min(perMin, needMin);
@@ -350,10 +379,10 @@ function renderReturnsChart(canvasId, data) {
         // Bars drawn first (behind lines)
         {
             type: 'bar',
-            label: `${data.ticker_a.symbol} ${periodicLabel} Return`,
-            data: periodicA,
-            backgroundColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.35), hexToRgba(COLORS.loss, 0.35)),
-            borderColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.6), hexToRgba(COLORS.loss, 0.6)),
+            label: `${data.ticker_a.symbol} Interval Return`,
+            data: barsA,
+            backgroundColor: barColors(barsA, hexToRgba(COLORS.gain, 0.35), hexToRgba(COLORS.loss, 0.35)),
+            borderColor: barColors(barsA, hexToRgba(COLORS.gain, 0.6), hexToRgba(COLORS.loss, 0.6)),
             borderWidth: 1,
             yAxisID: 'y1',
             order: 2,
@@ -362,10 +391,10 @@ function renderReturnsChart(canvasId, data) {
         },
         {
             type: 'bar',
-            label: `${data.ticker_b.symbol} ${periodicLabel} Return`,
-            data: periodicB,
-            backgroundColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.35), hexToRgba(COLORS.orange, 0.35)),
-            borderColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.6), hexToRgba(COLORS.orange, 0.6)),
+            label: `${data.ticker_b.symbol} Interval Return`,
+            data: barsB,
+            backgroundColor: barColors(barsB, hexToRgba(COLORS.cyan, 0.35), hexToRgba(COLORS.orange, 0.35)),
+            borderColor: barColors(barsB, hexToRgba(COLORS.cyan, 0.6), hexToRgba(COLORS.orange, 0.6)),
             borderWidth: 1,
             yAxisID: 'y1',
             order: 2,
@@ -428,7 +457,7 @@ function renderReturnsChart(canvasId, data) {
                     },
                     title: {
                         display: true,
-                        text: periodicLabel + ' Return %',
+                        text: 'Interval Return %',
                         color: COLORS.text,
                         font: { size: 10, family: FONT.family },
                     },
