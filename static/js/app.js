@@ -391,22 +391,39 @@ function renderPeriodicReturnChart(canvasId, dates, periodicValues, symbol, peri
     const longPeriods = new Set(['1y', '2y', '5y']);
     const isMonthly = longPeriods.has(period);
     const barLabel = isMonthly ? 'Monthly' : 'Daily';
-    const labels = thinLabels(dates, 10);
 
-    const bgColors = periodicValues.map(v =>
+    // For monthly: filter to only non-null entries so bars fill the chart width
+    let chartDates, chartValues;
+    if (isMonthly) {
+        chartDates = [];
+        chartValues = [];
+        for (let i = 0; i < dates.length; i++) {
+            if (periodicValues[i] != null) {
+                chartDates.push(dates[i]);
+                chartValues.push(periodicValues[i]);
+            }
+        }
+    } else {
+        chartDates = dates;
+        chartValues = periodicValues;
+    }
+
+    const labels = thinLabels(chartDates, 10);
+
+    const bgColors = chartValues.map(v =>
         v == null ? 'transparent' : v >= 0 ? hexToRgba(COLORS.gain, 0.6) : hexToRgba(COLORS.loss, 0.6)
     );
-    const borderColors = periodicValues.map(v =>
+    const borderColors = chartValues.map(v =>
         v == null ? 'transparent' : v >= 0 ? COLORS.gain : COLORS.loss
     );
 
     charts[canvasId] = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dates,
+            labels: chartDates,
             datasets: [{
                 label: `${symbol} ${barLabel} Return`,
-                data: periodicValues,
+                data: chartValues,
                 backgroundColor: bgColors,
                 borderColor: borderColors,
                 borderWidth: 1,
