@@ -181,6 +181,20 @@
                 <div class="chart-wrapper-lg"><canvas id="chart-returns"></canvas></div>
             </div>
 
+            <!-- ─── Periodic Return Charts (side by side) ────────────── -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-1" id="chart-periodic-a-title">Ticker A — Returns</h3>
+                    <p class="text-[11px] text-gray-500 leading-relaxed mb-2">Daily or monthly return bars. Green = gain, red = loss.</p>
+                    <div class="chart-wrapper"><canvas id="chart-periodic-a"></canvas></div>
+                </div>
+                <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
+                    <h3 class="text-sm font-semibold text-gray-300 mb-1" id="chart-periodic-b-title">Ticker B — Returns</h3>
+                    <p class="text-[11px] text-gray-500 leading-relaxed mb-2">Daily or monthly return bars. Green = gain, red = loss.</p>
+                    <div class="chart-wrapper"><canvas id="chart-periodic-b"></canvas></div>
+                </div>
+            </div>
+
             <!-- ─── Price Ratio + Moving Averages Chart ────────────────── -->
             <div class="bg-surface-2 rounded-xl border border-gray-800 p-4">
                 <h3 class="text-sm font-semibold text-gray-300 mb-1">Price Ratio (A/B) with Moving Averages</h3>
