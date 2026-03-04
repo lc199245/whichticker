@@ -134,6 +134,8 @@ function renderResults(data) {
         document.getElementById('input-period').value,
         combined.direction || 'NEUTRAL',
         combined.conviction || 0,
+        data.ticker_a.name,
+        data.ticker_b.name,
     );
 
     // Re-init lucide icons for any new elements
@@ -899,6 +901,11 @@ function destroyChart(key) {
 
 // ── Utilities ───────────────────────────────────────────────────────────────
 
+function truncName(name, max = 18) {
+    if (!name) return '';
+    return name.length > max ? name.slice(0, max) + '…' : name;
+}
+
 function fmt(val, decimals = 2) {
     if (val === null || val === undefined || isNaN(val)) return 'N/A';
     return Number(val).toFixed(decimals);
@@ -1068,7 +1075,7 @@ function saveHistory(history) {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 
-function addToHistory(tickerA, tickerB, period, signal, conviction) {
+function addToHistory(tickerA, tickerB, period, signal, conviction, nameA, nameB) {
     const history = getHistory();
 
     const idx = history.findIndex(h => h.tickerA === tickerA && h.tickerB === tickerB && h.period === period);
@@ -1077,6 +1084,8 @@ function addToHistory(tickerA, tickerB, period, signal, conviction) {
     history.unshift({
         tickerA,
         tickerB,
+        nameA: nameA || '',
+        nameB: nameB || '',
         period,
         signal,
         conviction,
@@ -1138,7 +1147,11 @@ function renderHistory() {
 
         return `
             <div class="history-row" onclick="replayHistory(${i})">
-                <span class="history-pair">${escapeHtml(h.tickerA)} / ${escapeHtml(h.tickerB)}</span>
+                <span class="history-pair">
+                    ${escapeHtml(h.tickerA)}${h.nameA ? ' <span class="history-name">' + escapeHtml(truncName(h.nameA)) + '</span>' : ''}
+                    <span class="history-vs">/</span>
+                    ${escapeHtml(h.tickerB)}${h.nameB ? ' <span class="history-name">' + escapeHtml(truncName(h.nameB)) + '</span>' : ''}
+                </span>
                 <span class="history-period">${escapeHtml(h.period)}</span>
                 <span class="history-signal ${sigCls}">${sigLabel}</span>
                 <div class="history-conviction">${meterFill}${meterLabel}</div>

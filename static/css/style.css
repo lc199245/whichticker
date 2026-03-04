@@ -274,7 +274,17 @@
     font-size: 0.8rem;
     font-weight: 600;
     color: #e5e7eb;
-    min-width: 140px;
+    min-width: 200px;
+}
+.history-name {
+    font-weight: 400;
+    font-size: 0.65rem;
+    color: #6b7280;
+    font-family: 'Inter', sans-serif;
+}
+.history-vs {
+    color: #4b5563;
+    margin: 0 2px;
 }
 .history-period {
     font-size: 0.65rem;
