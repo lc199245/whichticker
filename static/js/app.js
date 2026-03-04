@@ -97,8 +97,8 @@ function renderResults(data) {
     // Periodic Return Bar Charts (daily or monthly)
     const period = document.getElementById('input-period').value;
     const periodicLabel = data.returns.periodic_label || 'Daily';
-    renderPeriodicReturnChart('chart-periodic-a', data.returns.dates, data.returns.periodic_a, data.ticker_a.symbol, period);
-    renderPeriodicReturnChart('chart-periodic-b', data.returns.dates, data.returns.periodic_b, data.ticker_b.symbol, period);
+    renderPeriodicReturnChart('chart-periodic-a', data.returns.dates, data.returns.periodic_a, data.ticker_a.symbol, periodicLabel);
+    renderPeriodicReturnChart('chart-periodic-b', data.returns.dates, data.returns.periodic_b, data.ticker_b.symbol, periodicLabel);
     document.getElementById('chart-periodic-a-title').textContent = `${data.ticker_a.symbol} — ${periodicLabel} Returns (%)`;
     document.getElementById('chart-periodic-b-title').textContent = `${data.ticker_b.symbol} — ${periodicLabel} Returns (%)`;
 
@@ -386,11 +386,9 @@ function renderReturnsChart(canvasId, data) {
 
 // ── Periodic Return Bar Chart (one per ticker) ──────────────────────────────
 
-function renderPeriodicReturnChart(canvasId, dates, periodicValues, symbol, period) {
+function renderPeriodicReturnChart(canvasId, dates, periodicValues, symbol, barLabel) {
     const ctx = document.getElementById(canvasId).getContext('2d');
-    const longPeriods = new Set(['1y', '2y', '5y']);
-    const isMonthly = longPeriods.has(period);
-    const barLabel = isMonthly ? 'Monthly' : 'Daily';
+    const isMonthly = barLabel === 'Monthly';
 
     // For monthly: filter to only non-null entries so bars fill the chart width
     let chartDates, chartValues;
