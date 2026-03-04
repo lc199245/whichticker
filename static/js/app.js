@@ -338,7 +338,7 @@ function renderReturnsChart(canvasId, data) {
             backgroundColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.35), hexToRgba(COLORS.loss, 0.35)),
             borderColor: barColors(periodicA, hexToRgba(COLORS.gain, 0.6), hexToRgba(COLORS.loss, 0.6)),
             borderWidth: 1,
-            yAxisID: 'y',
+            yAxisID: 'y1',
             order: 2,
             barPercentage: 0.9,
             categoryPercentage: 0.8,
@@ -350,7 +350,7 @@ function renderReturnsChart(canvasId, data) {
             backgroundColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.35), hexToRgba(COLORS.orange, 0.35)),
             borderColor: barColors(periodicB, hexToRgba(COLORS.cyan, 0.6), hexToRgba(COLORS.orange, 0.6)),
             borderWidth: 1,
-            yAxisID: 'y',
+            yAxisID: 'y1',
             order: 2,
             barPercentage: 0.9,
             categoryPercentage: 0.8,
@@ -393,9 +393,31 @@ function renderReturnsChart(canvasId, data) {
                 x: { ...baseXScale(labels) },
                 y: {
                     ...baseYScale(),
+                    position: 'left',
                     ticks: {
                         ...baseYScale().ticks,
                         callback: function(val) { return val.toFixed(1) + '%'; },
+                    },
+                },
+                y1: {
+                    ...baseYScale(),
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        ...baseYScale().ticks,
+                        callback: function(val) { return val.toFixed(1) + '%'; },
+                    },
+                    title: {
+                        display: true,
+                        text: periodicLabel + ' Return %',
+                        color: COLORS.text,
+                        font: { size: 10, family: FONT.family },
+                    },
+                    // Keep zero aligned with primary axis
+                    afterDataLimits: function(axis) {
+                        const max = Math.max(Math.abs(axis.min), Math.abs(axis.max));
+                        axis.min = -max;
+                        axis.max = max;
                     },
                 },
             },
